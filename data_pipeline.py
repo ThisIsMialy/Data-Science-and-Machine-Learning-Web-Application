@@ -7,6 +7,7 @@ import csv
 import pandas as pd
 import numpy as np
 from IPython.display import display
+from anyio.streams import file
 
 '''
 Data Cleaning and Sanitization 
@@ -52,9 +53,7 @@ def compute_charging_power(df) -> pd.DataFrame:
         :param df: Dataframe from clean_data()
         :return: pandas DataFrame
     """
-
-    print("COMPUTING CHARGING POWER RATE")
-    df["Power_kW"] = df["Energy_kWh"] / (df["Duration_Mins"] / 60 )
+    df["Power_kW"] = round(df["Energy_kWh"] / (df["Duration_Mins"] / 60 ), 2)
 
 
     df["Peak_Hour_Flag"] =df.apply(lambda row:
@@ -66,20 +65,15 @@ def compute_charging_power(df) -> pd.DataFrame:
     charger_group_summary = df[["Power_kW", "Battery_Temp_C", "Charger_Type"]].groupby("Charger_Type").mean()
     peak_hour_summary = df[["Power_kW", "Battery_Temp_C", "Peak_Hour_Flag"]].groupby("Peak_Hour_Flag").mean()
 
-    # reverse = df[["Power_kW", "Battery_Temp_C", "Charger_Type"]].groupby("Battery_Temp_C").mean()
-
     print(display(charger_group_summary))
     display(peak_hour_summary)
-
-
 
     return df
 
 def clean_data(headers, csv_reader) -> pd.DataFrame:
 
     """
-        Open CSV file with open() and skips headers (store for later)
-        Read file with csv.reader -> <class '_csv.reader'>
+
         Convert to list then to Pandas DataFrame
         Turn numerical values into numerical values with
         Returns a list of column names with missing/null values
@@ -107,43 +101,33 @@ def clean_data(headers, csv_reader) -> pd.DataFrame:
         median = df[col].median()
         df[col] = df[col].fillna(median)
 
-    # median_duration = df['Duration_Mins'].median()
-    # median_energy = df['Energy_kWh'].median()
-    #
-    # print(f"REPLACING MISSING VALUES AT COLUMN: Duration_Mins")
-    # df['Duration_Mins'] = df['Duration_Mins'].fillna(median_duration)
-    # df['Energy_kWh'] = df['Energy_kWh'].fillna(median_energy)
-    #
-    # df = df.fillna({
-    #     'Duration_Mins': df['Duration_Mins'].median(),
-    #     'Energy_kWh': df['Energy_kWh'].median(),
-    # })
-
-    # Before
-    # df.info()
-
+    # This removes all duplicate records from the Dataframe
     df.drop_duplicates()
-
-    # After
-    # df.info()
 
     return df
 
-    # clean_data = list(filter(
-    #     lambda row: all(item for item in row),
-    #     csv_reader
-    # ))
-    # csv_writer.writerow(headers)
 
+def main() -> None:
+    """
+    Open CSV file with open() and skips headers (store for later)
+    Read file with csv.reader -> <class '_csv.reader'>
 
+    Pass the data to function clean_data() -> DataFrame
+    This cleans the data off missing values and duplicates
 
-def main():
+    Pass the cleaned data to compute_charging_power() -> DataFrame
+    This adds the columns : Power_kW and Peak_Hour_Flag
+
+    Convert to list and store the final cleaned DataFrame to clean_ev_campus_dataset.csv
+
+    :return: None
+    """
 
     try:
         with (open(file='files/ev_campus_dataset.csv', encoding='utf-8', mode='r') as ev_file,
-              open(file='clean_ev_campus_dataset.csv', encoding='utf-8', mode='w') as cleaned_file):
+              open(file='files/clean_ev_campus_dataset.csv', newline='', encoding='utf-8', mode='w') as cleaned_file):
             csv_reader = csv.reader(ev_file)
-            # csv_writer = csv.writer(cleaned_file)
+            csv_writer = csv.writer(cleaned_file)
 
             headers = next(csv_reader)
 
@@ -151,15 +135,18 @@ def main():
 
             computed_charging_power = compute_charging_power(cleaned)
 
+            headers.append("Power_kW")
+            headers.append("Peak_Hour_Flag")
+            csv_writer.writerow(headers)
 
-
+            csv_writer.writerows(computed_charging_power.values.tolist())
 
     except FileNotFoundError:
-        print("File not found")
+        print("[FILE ERROR] File not found. Check filename or file path.")
     else:
-        print(f'Files successfully read.')
+        print(f'[FILE SUCCESS] File `{ev_file.name}` was successfully cleaned.')
     finally:
-        print('[STREAM IO] Data has been cleaned.')
+        print('[STREAM I/O] Files are closed.')
 
 
 if __name__ == '__main__':

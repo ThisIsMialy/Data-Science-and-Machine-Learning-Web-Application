@@ -1,4 +1,5 @@
 """
+ASSESSMENT 2
 filename: datapipeline.py
 """
 
@@ -7,18 +8,30 @@ import csv
 import pandas as pd
 import numpy as np
 from IPython.display import display
-from anyio.streams import file
+
 
 '''
 Data Cleaning and Sanitization 
-1. Detect missing values 
-
-Median Imputation: Replaces the missing value with the middle value
-all the non-missing values 
-
-Remove duplicate session records
 
 '''
+
+def determine_efficiency_group(energy) -> str:
+    """
+    Categorizes into the appropriate efficiency group based on energy consumption
+    :param energy: of each record (in kWh)
+    :return: str
+    """
+    if energy < 14:
+        return "Hyper-Efficient"
+    elif 14 <= energy < 16:
+        return "Highly Efficient"
+    elif 16 <= energy < 20:
+        return "Standard"
+    elif energy >= 20:
+        return "Low Efficiency"
+    else:
+        return "Standard"
+
 
 def is_peak_hour_flag (start, duration, overstay) -> int :
     """
@@ -28,7 +41,6 @@ def is_peak_hour_flag (start, duration, overstay) -> int :
     :param overstay: in minutes
     :return: Boolean (True if stayed in peak hour)
     """
-
     total_duration_hour = (duration + overstay) / 60
     end_hour = start + total_duration_hour
     if 12 < start < 18:
@@ -41,20 +53,20 @@ def is_peak_hour_flag (start, duration, overstay) -> int :
 
 def compute_charging_power(df) -> pd.DataFrame:
     """
+        Determine Efficiency group of each record by applying lambda function and create new feature "Efficiency_Group"
         Compute charging power rate using (`Power_kW = Energy_kWh / (Duration_Mins / 60)`)
         Store Charging Power in DataFrame
+        Add a feature/column named Peak_Hour_Flag as Boolean
 
-        Add a column named Peak Hour Flag as Boolean
-
-
-        Statistical Aggregation
+        Statistical Aggregation:
         group-by summaries tables comparing average energy consumption and temperature
 
         :param df: Dataframe from clean_data()
         :return: pandas DataFrame
     """
-    df["Power_kW"] = round(df["Energy_kWh"] / (df["Duration_Mins"] / 60 ), 2)
+    df["Efficiency_Group"] = df["Energy_kWh"].apply(lambda x: determine_efficiency_group(x))
 
+    df["Power_kW"] = round(df["Energy_kWh"] / (df["Duration_Mins"] / 60 ), 2)
 
     df["Peak_Hour_Flag"] =df.apply(lambda row:
                                    is_peak_hour_flag(row["Start_Hour"],
@@ -64,36 +76,25 @@ def compute_charging_power(df) -> pd.DataFrame:
 
     charger_group_summary = df[["Power_kW", "Battery_Temp_C", "Charger_Type"]].groupby("Charger_Type").mean()
     peak_hour_summary = df[["Power_kW", "Battery_Temp_C", "Peak_Hour_Flag"]].groupby("Peak_Hour_Flag").mean()
-
-    print(display(charger_group_summary))
+    print("\n")
+    print("----- SUMMARY TABLES ------")
+    print("----- Across Charger Types ------")
+    display(charger_group_summary)
+    print("----- Peak Hour Flags ------")
     display(peak_hour_summary)
 
     return df
 
-def clean_data(headers, csv_reader) -> pd.DataFrame:
-
+def clean_data(df) -> pd.DataFrame:
     """
-
-        Convert to list then to Pandas DataFrame
-        Turn numerical values into numerical values with
         Returns a list of column names with missing/null values
-
         Fill in all missing values with median imputation
-
         Remove duplicate session records with drop.duplicates()
 
         :return: pandas DataFrame
     """
 
-    df = pd.DataFrame(csv_reader, columns=headers)
-
-    df['Start_Hour'] = pd.to_numeric(df['Start_Hour'], errors='coerce')
-    df['Duration_Mins'] = pd.to_numeric(df['Duration_Mins'], errors='coerce')
-    df['Energy_kWh'] = pd.to_numeric(df['Energy_kWh'], errors='coerce')
-    df['Overstay_Mins'] = pd.to_numeric(df['Overstay_Mins'], errors='coerce')
-    df['Battery_Temp_C'] = pd.to_numeric(df['Battery_Temp_C'], errors='coerce')
-
-    print("FOUND MISSING VALUES AT COLUMN:")
+    print("-----FOUND MISSING VALUES AT COLUMN: -----")
     columns_with_null = df.columns[df.isna().sum() > 0].tolist()
     print(columns_with_null)
 
@@ -107,47 +108,49 @@ def clean_data(headers, csv_reader) -> pd.DataFrame:
     return df
 
 
-def main() -> None:
+def data_pipeline(file_in, file_out) -> None:
     """
-    Open CSV file with open() and skips headers (store for later)
-    Read file with csv.reader -> <class '_csv.reader'>
-
-    Pass the data to function clean_data() -> DataFrame
+    Open file_in with pandas read_csv -> DataFrame
+    Convert numerical features to appropriate numerical types
+    Pass Dataframe to clean_data -> DataFrame
     This cleans the data off missing values and duplicates
 
-    Pass the cleaned data to compute_charging_power() -> DataFrame
-    This adds the columns : Power_kW and Peak_Hour_Flag
+    Pass the cleaned DF to compute_charging_power() -> DataFrame
+    This function adds the columns : Efficiency_Group, Power_kW, Peak_Hour_Flag
 
-    Convert to list and store the final cleaned DataFrame to clean_ev_campus_dataset.csv
+    Store the final cleaned DataFrame to `assets/cleaned_ev_dataset.csv`
 
     :return: None
     """
 
     try:
-        with (open(file='files/ev_campus_dataset.csv', encoding='utf-8', mode='r') as ev_file,
-              open(file='files/clean_ev_campus_dataset.csv', newline='', encoding='utf-8', mode='w') as cleaned_file):
-            csv_reader = csv.reader(ev_file)
-            csv_writer = csv.writer(cleaned_file)
+        df = pd.read_csv(file_in, index_col=0)
 
-            headers = next(csv_reader)
+        df['Start_Hour'] = pd.to_numeric(df['Start_Hour'], errors='coerce')
+        df['Duration_Mins'] = pd.to_numeric(df['Duration_Mins'], errors='coerce')
+        df['Energy_kWh'] = pd.to_numeric(df['Energy_kWh'], errors='coerce')
+        df['Overstay_Mins'] = pd.to_numeric(df['Overstay_Mins'], errors='coerce')
+        df['Battery_Temp_C'] = pd.to_numeric(df['Battery_Temp_C'], errors='coerce')
 
-            cleaned = clean_data(headers, csv_reader)
-
-            computed_charging_power = compute_charging_power(cleaned)
-
-            headers.append("Power_kW")
-            headers.append("Peak_Hour_Flag")
-            csv_writer.writerow(headers)
-
-            csv_writer.writerows(computed_charging_power.values.tolist())
+        # Clean dataframe
+        cleaned = clean_data(df)
+        # Add other features
+        computed_charging_power = compute_charging_power(cleaned)
+        # Write dataframe to new file
+        computed_charging_power.to_csv(file_out, index=False)
 
     except FileNotFoundError:
         print("[FILE ERROR] File not found. Check filename or file path.")
     else:
-        print(f'[FILE SUCCESS] File `{ev_file.name}` was successfully cleaned.')
+        print(f'[FILE SUCCESS] File `{file_in}` was successfully cleaned.')
     finally:
-        print('[STREAM I/O] Files are closed.')
+        print('Files are closed.')
 
 
+# START HERE
 if __name__ == '__main__':
-    main()
+    # Declare file paths of the infile and outfile here
+    ev_in = 'assets/ev_campus_dataset.csv'
+    ev_out ='assets/cleaned_ev_dataset.csv'
+    data_pipeline(ev_in, ev_out)
+

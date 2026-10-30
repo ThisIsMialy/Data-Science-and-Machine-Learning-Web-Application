@@ -252,11 +252,11 @@ elif page == "3. Live Machine Learning Inference":
         energy_kwh = st.number_input("Energy Delivered (kWh) [5.0 - 120.0]",
                                      min_value=5.0, max_value=120.0, value=5.0, step=0.01)
 
-        overstay_mins = st.number_input("Overstay (in minutes)[0 - 120]"
-                                        , min_value=0, max_value=120, value=0, step=1)
+        overstay_mins = st.number_input("Overstay (in minutes)[0 - 300]"
+                                        , min_value=0, max_value=300, value=0, step=1)
 
-        battery_temp = st.slider("Battery Temperature (°C) [24.0 - 42.0]",
-                                 min_value=24.0, max_value=42.0, step=0.1)
+        battery_temp = st.slider("Battery Temperature (°C) [24.0 - 70.0]",
+                                 min_value=24.0, max_value=70.0, step=0.1)
 
         # Store peak_hour as 1 or 0
         peak_hour = st.selectbox("Is Peak Hour? (12PM - 5PM)", [0, 1],

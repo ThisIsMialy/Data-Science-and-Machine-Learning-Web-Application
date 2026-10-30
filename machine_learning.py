@@ -75,10 +75,13 @@ def get_metrics(y_test, y_pred) -> dict:
     f1 = round(f1_score(y_test, y_pred, average='weighted'), 4) * 100
     confusion_m = confusion_matrix(y_test, y_pred)
 
+    # Print in percentage the accuracy, precision, recall and f1 score
     print(f'Accuracy: {accuracy}% / Precision: {precision}% / Recall: {recall}% / F1: {f1}%')
+    # Print confusion matrix
     print("Confusion Matrix")
     print(confusion_m)
     print('\n')
+    # get and print classification report
     class_report = classification_report(y_test, y_pred, zero_division=0)
     print(class_report)
 
@@ -92,23 +95,25 @@ def get_metrics(y_test, y_pred) -> dict:
     }
 
 
-def print_results(score):
+def print_results(score) -> None:
     """
-    Called to print results of GridSearchCV
-    :param score:
-    :return:
+    Print best results of GridSearchCV
+    GridSearchCV is used to test and score the hyperparemeters of the models
+    :param score: score from GridSearchCV
+    :return: None
     """
     means = score.cv_results_['mean_test_score']
     sd = score.cv_results_['std_test_score']
 
     print(f'Grid Search Best Score: {round(score.best_score_, 5)} \n BEST PARAMS: {score.best_params_} \n')
 
+    ### PRINTS all scores
     # for mean, std, params in zip(means, sd, score.cv_results_['params']):
     #     print(f'{round(mean, 2)} (+/-{round(std * 2, 2)}) for {params}')
 
 def plot_heatmap(confusion_m, class_labels, ax):
     """
-    Create a heatmap given the confusion matrix of a model's predictions
+    Create and return a heatmap given the confusion matrix of a model's predictions
     :param confusion_m: confusion matrix from metrics
     :param class_labels: Grid Status Labels
     :param ax: axes position to place the heatmap
@@ -131,21 +136,26 @@ def compare_best_models(models,
                         X_test,
                         y_test) -> Pipeline | None:
     """
-    Compare the best estimators based on accuracy
+    Compare the best models based on accuracy
+    All best models are stored in array `models`
+    Predict using X_test dataset and compare the predictions to y_test
+    Call the function `get_metrics` to calculate the score of each model
+    Create and plot heatmaps for each model using the `for` loop
+    Store the best_accuracy and best best_model_overall
 
     :param models: all trained models
     :param model_names: names of models in order of their appearance
     :param X_test: datasets to be tested on
     :param y_test: Actual values of labels (X_test)
-    :return:
+    :return: Pipeline containing model
     """
-
     best_accuracy = 0
     best_model_overall = None
 
     # Plot heatmaps in the same grid for comparison
     fig, axes = plt.subplots(1, len(models), figsize=(32, 8))
 
+    # Plot heatmaps for the confusion matrix of each model
     for ax, (name, model) in enumerate(zip(model_names, models)):
         y_pred = model.predict(X_test)
         class_labels = model.classes_
@@ -158,22 +168,36 @@ def compare_best_models(models,
             best_accuracy = metrics['accuracy']
             best_model_overall = model
 
+        # call function plot_heatmap to get the seaborn heat map
         plot_heatmap(metrics['confusion_m'], class_labels, axes[ax])
         axes[ax].set_title(name)
         axes[ax].set_xlabel("Predicted Grid Status")
         axes[ax].set_ylabel("True Grid Status")
+
     plt.tight_layout()
     plt.show()
-
     print(f"The best model is: {best_model_overall}")
 
     return best_model_overall
 
+
 def apply_decision_tree_classifier(X_train, y_train) -> Pipeline:
     """
-    :param X_train:
-    :param y_train:
-    :return: Pipeline for DecisionTreeClassifier()
+    Pipeline has:
+    1. StandardScaler(), to scale the training data that passes through
+    2. Estimator = DecisionTreeClassifier() at random state = 42
+
+    Stratified K-fold is applied to the training dataset, split into 5
+    Then calculate baseline of the model using `cross_val_score` to get Mean accuracy
+
+    Tune the hyperparameters for the estimator
+    Then apply cross-validation and call GridSearchCV to find the best hyperparameters
+
+    Call `print_results` to determine the best scoring hyperparameters
+
+    :param X_train: Training data
+    :param y_train: Training labels
+    :return: Best estimator returned as Pipeline with DecisionTreeClassifier()
     """
     dtc_pipe = Pipeline([
         ('scaler', StandardScaler()),
@@ -210,9 +234,21 @@ def apply_decision_tree_classifier(X_train, y_train) -> Pipeline:
 
 def apply_support_vector_classifier(X_train, y_train) -> Pipeline:
     """
-    :param X_train:
-    :param y_train:
-    :return: Pipeline for SVC() [Support Vector Classifier
+    Pipeline has:
+    1. StandardScaler(), to scale the training data that passes through
+    2. Estimator = SVC() at random state = 42 [Support Vector Classifier]
+
+    Stratified K-fold is applied to the training dataset, split into 5
+    Then calculate baseline of the model using `cross_val_score` to get Mean accuracy
+
+    Tune the hyperparameters for the estimator
+    Then apply cross-validation and call GridSearchCV to find the best hyperparameters
+
+    Call `print_results` to determine the best scoring hyperparameters
+
+    :param X_train: Training data
+    :param y_train: Training labels
+    :return: Best estimator returned as Pipeline with SVC()
     """
     svc_pipe = Pipeline([
         ('scaler', StandardScaler()),
@@ -251,11 +287,21 @@ def apply_support_vector_classifier(X_train, y_train) -> Pipeline:
 
 def apply_logistic_regression(X_train, y_train) -> Pipeline:
     """
-    Objective: Apply Logistic Regression to X and y and find the best parameter
-    Split Dataset into Training and testing (80 - 20)
-    :param X_train:
-    :param y_train:
-    :return: Pipeline for LogisticRegression()
+    Pipeline has:
+    1. StandardScaler(), to scale the training data that passes through
+    2. Estimator = LogisticRegression() at random state = 42
+
+    Stratified K-fold is applied to the training dataset, split into 5
+    Then calculate baseline of the model using `cross_val_score` to get Mean accuracy
+
+    Tune the hyperparameters for the estimator
+    Then apply cross-validation and call GridSearchCV to find the best hyperparameters
+
+    Call `print_results` to determine the best scoring hyperparameters
+
+    :param X_train: Training data
+    :param y_train: Training labels
+    :return: Best estimator returned as Pipeline with LogisticRegression()
     """
 
     # Apply Standard Scaler when model is called
@@ -297,11 +343,21 @@ def apply_logistic_regression(X_train, y_train) -> Pipeline:
 
 def apply_random_forest_classifier(X_train, y_train) -> Pipeline:
     """
-    RFC does not need Standard Scaling
+    Estimator = RandomForestClassifier() at random state = 42
+    [No scaling required for RandomForestClassifier()]
 
-    :param y_train:
-    :param X_train:
-    :return: RandomForestClassifier() [No scaling required]
+    Stratified K-fold is applied to the training dataset, split into 5
+    Then calculate baseline of the model using `cross_val_score` to get Mean accuracy
+
+    Tune the hyperparameters for the estimator
+    Then apply cross-validation and call GridSearchCV to find the best hyperparameters
+
+    Call `print_results` to determine the best scoring hyperparameters
+
+    :param X_train: Training data
+    :param y_train: Training labels
+    :return: Best estimator returned as RandomForestClassifier()
+    :return: RandomForestClassifier()
     """
     rfc_pipe = RandomForestClassifier(
         max_features='sqrt',
@@ -346,15 +402,19 @@ def apply_random_forest_classifier(X_train, y_train) -> Pipeline:
 def main() -> None:
     """
     Open CSV file with Pandas and convert to DataFrame.
-    One hot encoding of `Grid_Status_Label` with
+    One hot encoding of `Grid_Status_Label` with `OneHotEncoder`
+
+    To train data (X):
+    Drop columns that may be irrelevant and/or calculated from other features
+    ['Session_ID', 'User_Type', 'Efficiency_Group',
+    'Carbon_Savings_kgCO2', 'Power_kW', 'Grid_Status_Label']
+
+    To test data (y): Store only Grid_Status_Label
 
     Runs ML algorithms on the split datasets
-    Evaluate performance of each algorithm and compare
-    Export the best model with pickle
-
-    Extract the features to only use
-    X =
-    :return:
+    Evaluate performance of each model and compare their accuracies
+    Export the best model (one model) with joblib
+    :return: None
     """
     df = pd.read_csv('assets/cleaned_ev_dataset.csv')
 
@@ -375,17 +435,18 @@ def main() -> None:
     final_df = pd.concat([df.drop(columns=['Charger_Type']), encoded_df], axis=1)
 
     # Drop features that do not matter: Session ID, Grid Status
-    # Drop feautures that were calculated from other features : Power, Carbon_Savings
+    # Drop features that were calculated from other features : Power, Carbon_Savings
     X = final_df.drop(columns=['Session_ID', 'User_Type', 'Efficiency_Group',
                                'Carbon_Savings_kgCO2', 'Power_kW', 'Grid_Status_Label'])
     y = final_df['Grid_Status_Label']
 
-    # print("Features: ", X.columns)
 
     print("Training data........ \n")
-    #
+
+    # Split data into 80% Training, 20% Testing
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+    # Call all classifiers (models) and get all only the best model after hyperparameter tuning
     best_lr = apply_logistic_regression(X_train, y_train)
 
     best_rfc = apply_random_forest_classifier(X_train, y_train)
@@ -394,6 +455,7 @@ def main() -> None:
 
     best_dtc = apply_decision_tree_classifier(X_train, y_train)
 
+    # Create array to store all the best estimators
     models = [best_lr, best_rfc, best_svc, best_dtc]
     model_names = [
         "Logistic Regression",
@@ -401,11 +463,14 @@ def main() -> None:
         "Support Vector Classifier",
         "Decision Tree Classifier",
     ]
-
+    # Only save the best model after comparison
+    # Model persistence: use `joblib` to store highest-performing model
     best_model_overall = compare_best_models(models, model_names, X_test, y_test)
     save_model_joblib(best_model_overall)
 
     return None
 
+
+# START HERE
 if __name__ == '__main__':
     main()

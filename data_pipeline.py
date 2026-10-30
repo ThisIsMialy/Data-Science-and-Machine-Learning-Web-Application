@@ -1,19 +1,19 @@
 """
-ASSESSMENT 2
-filename: datapipeline.py
+datapipeline.py
+ITS72604 Assessment 2
+
+TASK 1: Exploratory Data Analysis & Preprocessing Pipeline
+
+GOAL:
+Create the sanitized data into 'cleaned_ev_dataset.csv'
 """
 
+
 # LIBRARIES
-import csv
 import pandas as pd
-import numpy as np
 from IPython.display import display
 
 
-'''
-Data Cleaning and Sanitization 
-
-'''
 
 def determine_efficiency_group(energy) -> str:
     """
@@ -59,7 +59,9 @@ def compute_charging_power(df) -> pd.DataFrame:
         Add a feature/column named Peak_Hour_Flag as Boolean
 
         Statistical Aggregation:
-        group-by summaries tables comparing average energy consumption and temperature
+        group-by summaries tables
+        1. comparing average energy consumption and temperature across charger types
+        2. comparing average energy consumption and temperature across peak hour flags
 
         :param df: Dataframe from clean_data()
         :return: pandas DataFrame
@@ -67,6 +69,8 @@ def compute_charging_power(df) -> pd.DataFrame:
     df["Efficiency_Group"] = df["Energy_kWh"].apply(lambda x: determine_efficiency_group(x))
 
     df["Power_kW"] = round(df["Energy_kWh"] / (df["Duration_Mins"] / 60 ), 2)
+
+    df["Carbon_Savings_kgCO2"] = round(df["Energy_kWh"] * 0.475, 2)
 
     df["Peak_Hour_Flag"] =df.apply(lambda row:
                                    is_peak_hour_flag(row["Start_Hour"],
@@ -76,12 +80,16 @@ def compute_charging_power(df) -> pd.DataFrame:
 
     charger_group_summary = df[["Power_kW", "Battery_Temp_C", "Charger_Type"]].groupby("Charger_Type").mean()
     peak_hour_summary = df[["Power_kW", "Battery_Temp_C", "Peak_Hour_Flag"]].groupby("Peak_Hour_Flag").mean()
+
+    # Display the summary tables
     print("\n")
     print("----- SUMMARY TABLES ------")
     print("----- Across Charger Types ------")
     display(charger_group_summary)
+    print("\n")
     print("----- Peak Hour Flags ------")
     display(peak_hour_summary)
+    print("\n")
 
     return df
 
@@ -111,7 +119,7 @@ def clean_data(df) -> pd.DataFrame:
 def data_pipeline(file_in, file_out) -> None:
     """
     Open file_in with pandas read_csv -> DataFrame
-    Convert numerical features to appropriate numerical types
+    Convert numerical features to appropriate numerical types using `pd.to_numeric`
     Pass Dataframe to clean_data -> DataFrame
     This cleans the data off missing values and duplicates
 
@@ -122,7 +130,7 @@ def data_pipeline(file_in, file_out) -> None:
 
     :return: None
     """
-
+    # use `try...except...finally` to safely open and close files and catch errors
     try:
         df = pd.read_csv(file_in, index_col=0)
 
@@ -134,10 +142,12 @@ def data_pipeline(file_in, file_out) -> None:
 
         # Clean dataframe
         cleaned = clean_data(df)
+        print(cleaned.head())
         # Add other features
         computed_charging_power = compute_charging_power(cleaned)
+        print(computed_charging_power.head())
         # Write dataframe to new file
-        computed_charging_power.to_csv(file_out, index=False)
+        computed_charging_power.to_csv(file_out)
 
     except FileNotFoundError:
         print("[FILE ERROR] File not found. Check filename or file path.")
